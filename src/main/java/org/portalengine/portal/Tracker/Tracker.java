@@ -52,6 +52,8 @@ public class Tracker extends Auditable<String> {
 	private String listFields;
 	private String formFields;
 	private String displayFields;
+	private String searchFields;
+	private String filterFields;
 	private String initialStatus;
 	private Long nodeId;
 	
@@ -86,6 +88,8 @@ public class Tracker extends Auditable<String> {
 		newtracker.trackerType = this.trackerType;
 		newtracker.listFields = this.listFields;
 		newtracker.formFields = this.formFields;
+		newtracker.searchFields = this.searchFields;
+		newtracker.filterFields = this.filterFields;
 		newtracker.displayFields = this.displayFields;
 		newtracker.initialStatus = this.initialStatus;
 		newtracker.dataTable = this.dataTable + "_" + newNodeId.toString();
@@ -156,11 +160,11 @@ public class Tracker extends Auditable<String> {
 	void checkTables() {
 		if(this.dataTable.length()==0) {
 			this.dataTable = "trak_" + this.slug + "_data";
-			this.dataTable = this.dataTable.toUpperCase();
+			this.dataTable = this.dataTable.toLowerCase();
 		}
 		if(this.trackerType.equals("Trailed Tracker") && this.updatesTable.length()==0) {
 			this.updatesTable = "trak_" + this.slug + "_updates";
-			this.updatesTable = this.updatesTable.toUpperCase();
+			this.updatesTable = this.updatesTable.toLowerCase();
 		}
 	}
 	

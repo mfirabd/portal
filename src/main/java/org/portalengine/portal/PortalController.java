@@ -6,11 +6,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
 import javax.servlet.http.HttpServletRequest;
 
 import org.portalengine.portal.FileLink.FileLink;
 import org.portalengine.portal.FileLink.FileLinkService;
+import org.portalengine.portal.Module.ModuleService;
 import org.portalengine.portal.Page.Page;
 import org.portalengine.portal.Page.PageService;
 import org.portalengine.portal.Setting.SettingService;
@@ -43,6 +45,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
@@ -73,6 +76,9 @@ public class PortalController {
 	
 	@Autowired
 	private UserService userService;
+	
+	@Autowired
+	private ModuleService moduleService;
 	
 	@Autowired
 	private PasswordEncoder passwordEncoder;
@@ -124,9 +130,9 @@ public class PortalController {
 	}
 	
 	@PostMapping("/setup")
-	public String doSetupSite(Model model) {
+	public String doSetupSite(Model model, HttpServletRequest request) {
 		User admin = userService.getRepo().findByUsername("admin");
-		model.addAttribute("admin",admin);
+		
 		if(admin==null) {
 			admin = new User("admin", "admin", "Admin", "admin@portal.com", passwordEncoder.encode("admin123"), true);
 			userService.getRepo().save(admin);
@@ -137,12 +143,78 @@ public class PortalController {
 				userService.getRepo().save(admin);
 			}
 		}
-		return "page/setup.html";
+		model.addAttribute("admin",admin);
+		String setup_modules = env.getProperty("setup_modules");		
+		if(setup_modules!=null) {
+			String[] modules = setup_modules.split(",");
+			for(String rawmodule : modules ) {
+				String module = rawmodule.trim();
+				System.out.println("Importing " + module);
+				moduleService.importModule(module);				
+				List<Tracker> trackers = trackerService.getRepo().findAllByModule(module);
+				for(Tracker tracker : trackers) {					
+					trackerService.updateDb(tracker);
+				}	
+				Page curpage = pageService.getRepo().findOneByModuleAndSlug(module, "post_module_import");
+				if(curpage!=null) {
+					System.out.println("Found post import page for " + module);
+					if(curpage.getRunable()) {				
+						System.out.println("Page is runable");
+						Binding binding = new Binding();		
+						GroovyShell shell = new GroovyShell(getClass().getClassLoader(),binding);
+						Map<String, String[]> postdata = request.getParameterMap();
+						binding.setVariable("pageService",pageService);
+						binding.setVariable("postdata", postdata);
+						binding.setVariable("request", request);
+						binding.setVariable("trackerService",trackerService);
+						binding.setVariable("treeService",treeService);
+						binding.setVariable("userService",userService);
+						binding.setVariable("fileService",fileService);
+						binding.setVariable("settingService", settingService);
+						binding.setVariable("env", env);				
+						Object content = null;
+						try {
+							content = shell.evaluate(curpage.getContent());
+							System.out.println("Content:" + content);
+						}
+						catch(Exception e) {
+							System.out.println("Error in page:" + e.toString());
+						}							
+						System.out.println("Done run page");
+					}
+				}
+			}
+		}
+		String post_setup_page = env.getProperty("post_setup_page");
+		if(post_setup_page!=null) {
+			String[] psetup = post_setup_page.split(":");
+			String mdl = "portal";
+			String slg = "";
+			if(psetup.length==2) {
+				mdl = psetup[0].trim();
+				slg = psetup[1].trim();
+			}
+			else if(psetup.length==1){
+				slg = psetup[0].trim();
+			}
+			else {
+				slg = post_setup_page.trim();
+			}			
+			Page curpage = pageService.getRepo().findOneByModuleAndSlug(mdl, slg);
+			if(curpage!=null) {			
+				return "redirect:/view/" + mdl + "/" + slg;
+			}
+		}
+		
+		return "redirect:/";
 	}
 	
-	@RequestMapping(path={"/img/{module}/{slug}","/img/{module}/{slug}/{arg1}","/img/{module}/{slug}/{arg1}/{arg2}","/img/{module}/{slug}/{arg1}/{arg2}/{arg3}","/img/{module}/{slug}/{arg1}/{arg2}/{arg3}/{arg4}","/img/{module}/{slug}/{arg1}/{arg2}/{arg3}/{arg4}/{arg5}"}, produces = MediaType.IMAGE_PNG_VALUE)
+	@RequestMapping(path={"/img/{slug}","/img/{module}/{slug}","/img/{module}/{slug}/{arg1}","/img/{module}/{slug}/{arg1}/{arg2}","/img/{module}/{slug}/{arg1}/{arg2}/{arg3}","/img/{module}/{slug}/{arg1}/{arg2}/{arg3}/{arg4}","/img/{module}/{slug}/{arg1}/{arg2}/{arg3}/{arg4}/{arg5}"}, produces = MediaType.IMAGE_PNG_VALUE, method={ RequestMethod.GET, RequestMethod.POST })
 	@ResponseBody
-	public Object pngPage(@PathVariable String module, @PathVariable String slug, Model model,HttpServletRequest request,@PathVariable(required=false) String arg1,@PathVariable(required=false) String arg2,@PathVariable(required=false) String arg3,@PathVariable(required=false) String arg4,@PathVariable(required=false) String arg5) {				
+	public Object pngPage(@PathVariable(required=false) String module, @PathVariable String slug, Model model,HttpServletRequest request,@PathVariable(required=false) String arg1,@PathVariable(required=false) String arg2,@PathVariable(required=false) String arg3,@PathVariable(required=false) String arg4,@PathVariable(required=false) String arg5) {
+		if(module==null) {
+			module = "portal";
+		}
 		Page curpage = pageService.getRepo().findOneByModuleAndSlug(module, slug);				
 		if(curpage!=null) {
 			if(curpage.getRunable()) {				
@@ -151,6 +223,7 @@ public class PortalController {
 				Map<String, String[]> postdata = request.getParameterMap();
 				binding.setVariable("pageService",pageService);
 				binding.setVariable("postdata", postdata);
+				binding.setVariable("request", request);
 				binding.setVariable("trackerService",trackerService);
 				binding.setVariable("treeService",treeService);
 				binding.setVariable("userService",userService);
@@ -181,9 +254,12 @@ public class PortalController {
 		}
 	}
 	
-	@RequestMapping(path={"/json/{module}/{slug}","/json/{module}/{slug}/{arg1}","/json/{module}/{slug}/{arg1}/{arg2}","/json/{module}/{slug}/{arg1}/{arg2}/{arg3}","/json/{module}/{slug}/{arg1}/{arg2}/{arg3}/{arg4}","/json/{module}/{slug}/{arg1}/{arg2}/{arg3}/{arg4}/{arg5}"}, produces = MediaType.APPLICATION_JSON_VALUE)
+	@RequestMapping(path={"/json/{slug}","/json/{module}/{slug}","/json/{module}/{slug}/{arg1}","/json/{module}/{slug}/{arg1}/{arg2}","/json/{module}/{slug}/{arg1}/{arg2}/{arg3}","/json/{module}/{slug}/{arg1}/{arg2}/{arg3}/{arg4}","/json/{module}/{slug}/{arg1}/{arg2}/{arg3}/{arg4}/{arg5}"}, produces = MediaType.APPLICATION_JSON_VALUE, method={ RequestMethod.GET, RequestMethod.POST })
 	@ResponseBody
-	public Object jsonPage(@PathVariable String module, @PathVariable String slug, Model model,HttpServletRequest request,@PathVariable(required=false) String arg1,@PathVariable(required=false) String arg2,@PathVariable(required=false) String arg3,@PathVariable(required=false) String arg4,@PathVariable(required=false) String arg5) {				
+	public Object jsonPage(@PathVariable(required=false)  String module, @PathVariable String slug, Model model,HttpServletRequest request,@PathVariable(required=false) String arg1,@PathVariable(required=false) String arg2,@PathVariable(required=false) String arg3,@PathVariable(required=false) String arg4,@PathVariable(required=false) String arg5) {
+		if(module==null) {
+			module = "portal";
+		}
 		Page curpage = pageService.getRepo().findOneByModuleAndSlug(module, slug);				
 		if(curpage!=null) {
 			if(curpage.getRunable()) {				
@@ -192,6 +268,7 @@ public class PortalController {
 				Map<String, String[]> postdata = request.getParameterMap();
 				binding.setVariable("pageService",pageService);
 				binding.setVariable("postdata", postdata);
+				binding.setVariable("request", request);
 				binding.setVariable("trackerService",trackerService);
 				binding.setVariable("treeService",treeService);
 				binding.setVariable("userService",userService);
@@ -222,66 +299,75 @@ public class PortalController {
 		}
 	}
 	
-	@RequestMapping(path={"/view/{module}/{slug}","/view/{module}/{slug}/{arg1}","/view/{module}/{slug}/{arg1}/{arg2}","/view/{module}/{slug}/{arg1}/{arg2}/{arg3}","/view/{module}/{slug}/{arg1}/{arg2}/{arg3}/{arg4}","/view/{module}/{slug}/{arg1}/{arg2}/{arg3}/{arg4}/{arg5}"})
-	public String viewPage(@PathVariable String module, @PathVariable String slug, Model model,HttpServletRequest request,@PathVariable(required=false) String arg1,@PathVariable(required=false) String arg2,@PathVariable(required=false) String arg3,@PathVariable(required=false) String arg4,@PathVariable(required=false) String arg5) {				
+	@RequestMapping(path={"/view/{slug}","/view/{module}/{slug}","/view/{module}/{slug}/{arg1}","/view/{module}/{slug}/{arg1}/{arg2}","/view/{module}/{slug}/{arg1}/{arg2}/{arg3}","/view/{module}/{slug}/{arg1}/{arg2}/{arg3}/{arg4}","/view/{module}/{slug}/{arg1}/{arg2}/{arg3}/{arg4}/{arg5}"},method={ RequestMethod.GET, RequestMethod.POST })
+	public String viewPage(@PathVariable(required=false) String module, @PathVariable String slug, Model model,HttpServletRequest request,@PathVariable(required=false) String arg1,@PathVariable(required=false) String arg2,@PathVariable(required=false) String arg3,@PathVariable(required=false) String arg4,@PathVariable(required=false) String arg5) {		
+		if(module==null) {
+			module = "portal";
+		}
 		Page curpage = pageService.getRepo().findOneByModuleAndSlug(module, slug);
 				
 		if(curpage!=null) {
-			if(curpage.getRunable()) {
-				if(curpage.getPage_type().equals("JSON")) {
-					return "redirect:/json/" + module + "/" + slug;
+			if(curpage.getPublished()!=null && curpage.getPublished()==true) {
+				if(curpage.getRunable()) {
+					if(curpage.getPage_type().equals("JSON")) {
+						return "redirect:/json/" + module + "/" + slug;
+					}
+					Binding binding = new Binding();		
+					GroovyShell shell = new GroovyShell(getClass().getClassLoader(),binding);
+					Map<String, String[]> postdata = request.getParameterMap();
+					binding.setVariable("pageService",pageService);
+					binding.setVariable("postdata", postdata);				
+					binding.setVariable("request", request);
+					binding.setVariable("trackerService",trackerService);
+					binding.setVariable("treeService",treeService);
+					binding.setVariable("userService",userService);
+					binding.setVariable("fileService",fileService);
+					binding.setVariable("settingService", settingService);	
+					binding.setVariable("env", env);
+					binding.setVariable("arg1", arg1);
+					binding.setVariable("arg2", arg2);
+					binding.setVariable("arg3", arg3);
+					binding.setVariable("arg4", arg4);
+					binding.setVariable("arg5", arg5);
+					String content = null;
+					try {
+						content = (String) shell.evaluate(curpage.getContent());					
+					}
+					catch(Exception e) {
+						System.out.println("Error in page:" + e.toString());
+					}
+					if(curpage.getPage_type().equals("Template")) {
+						model.addAttribute("pageTitle","Running " + curpage.getTitle());
+						model.addAttribute("page", curpage);
+						model.addAttribute("content",content);
+						model.addAttribute("env", env);
+						model.addAttribute("arg1",arg1);
+						model.addAttribute("arg2",arg2);
+						model.addAttribute("arg3",arg3);
+						model.addAttribute("arg4",arg4);
+						model.addAttribute("arg5",arg5);
+						return "page/plain.html";	
+					}				
+					else {
+						// if wish to redirect then page should return a string beginning with "redirect:/" and target
+						return content;
+					}
 				}
-				Binding binding = new Binding();		
-				GroovyShell shell = new GroovyShell(getClass().getClassLoader(),binding);
-				Map<String, String[]> postdata = request.getParameterMap();
-				binding.setVariable("pageService",pageService);
-				binding.setVariable("postdata", postdata);				
-				binding.setVariable("trackerService",trackerService);
-				binding.setVariable("treeService",treeService);
-				binding.setVariable("userService",userService);
-				binding.setVariable("fileService",fileService);
-				binding.setVariable("settingService", settingService);	
-				binding.setVariable("env", env);
-				binding.setVariable("arg1", arg1);
-				binding.setVariable("arg2", arg2);
-				binding.setVariable("arg3", arg3);
-				binding.setVariable("arg4", arg4);
-				binding.setVariable("arg5", arg5);
-				String content = null;
-				try {
-					content = (String) shell.evaluate(curpage.getContent());					
-				}
-				catch(Exception e) {
-					System.out.println("Error in page:" + e.toString());
-				}
-				if(curpage.getPage_type().equals("Template")) {
-					model.addAttribute("pageTitle","Running " + curpage.getTitle());
+				else {
+					model.addAttribute("pageTitle",curpage.getTitle());
 					model.addAttribute("page", curpage);
-					model.addAttribute("content",content);
+					model.addAttribute("content", curpage.getContent());
 					model.addAttribute("env", env);
 					model.addAttribute("arg1",arg1);
 					model.addAttribute("arg2",arg2);
 					model.addAttribute("arg3",arg3);
 					model.addAttribute("arg4",arg4);
 					model.addAttribute("arg5",arg5);
-					return "page/plain.html";	
-				}				
-				else {
-					// if wish to redirect then page should return a string beginning with "redirect:/" and target
-					return content;
+					return "page/plain.html";
 				}
 			}
 			else {
-				model.addAttribute("pageTitle",curpage.getTitle());
-				model.addAttribute("page", curpage);
-				model.addAttribute("content", curpage.getContent());
-				model.addAttribute("env", env);
-				model.addAttribute("arg1",arg1);
-				model.addAttribute("arg2",arg2);
-				model.addAttribute("arg3",arg3);
-				model.addAttribute("arg4",arg4);
-				model.addAttribute("arg5",arg5);
-				return "page/plain.html";
+				return "error/403";
 			}
 		}
 		else {
@@ -289,9 +375,12 @@ public class PortalController {
 		}
 	}	
 	
-	@GetMapping("/download/{module}/{slug}")
+	@GetMapping(path={"/download/{slug}","/download/{module}/{slug}"})
 	@ResponseBody
-	public ResponseEntity<Resource> downloadFile(@PathVariable String module, @PathVariable String slug, Model model,HttpServletRequest request) {
+	public ResponseEntity<Resource> downloadFile(@PathVariable(required=false)  String module, @PathVariable String slug, Model model,HttpServletRequest request) {
+		if(module==null) {
+			module = "portal";
+		}
 		FileLink curfile = fileService.getRepo().findOneByModuleAndSlug(module, slug);
 		if(curfile!=null) {
 			Resource resfile = fileService.getResource(curfile);

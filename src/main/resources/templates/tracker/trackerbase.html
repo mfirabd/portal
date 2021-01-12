@@ -124,8 +124,10 @@ $('#val_[(${field.name})]').select2({
 <select th:if="${field.fieldType=='TreeNode' || field.fieldType=='TrackerType' || field.fieldType=='User'}" th:class="${fieldclass}" type='text' th:id="${'val_' + field.name}" th:name="${'val_' + field.name}">
 	<option th:value="${datas?.get(field.name)?.toString()}" th:text="${datas?.get(field.name)?.toString()}">option</option>
 </select>
-<input th:if="${field.fieldType!='TreeNode' && field.fieldType!='Date' && field.fieldType!='DateTime' && field.fieldType!='TrackerType' && field.fieldType!='User'}" th:class="${fieldclass + field.typeClass()}" type='text' th:id="${'val_' + field.name}" th:name="${'val_' + field.name}" th:value="${field.display(datas)}"/>
+<input th:if="${field.fieldType!='TreeNode' && field.fieldType!='Date' && field.fieldType!='DateTime' && field.fieldType!='TrackerType' && field.fieldType!='User' && field.fieldType!='Text'}" th:class="${fieldclass + field.typeClass()}" type='text' th:id="${'val_' + field.name}" th:name="${'val_' + field.name}" th:value="${@trackerService.display(field,datas)}"/>
 <input th:if="${field.fieldType=='Date' || field.fieldType=='DateTime'}" th:class="${fieldclass + field.typeClass()}" type='text' th:id="${'val_' + field.name}" th:attr="data-target=${'#val_' + field.name}" data-toggle="datetimepicker" th:name="${'val_' + field.name}"/>
+<textarea th:if="${field.fieldType=='Text'}" th:class="${fieldclass + field.typeClass()}" th:id="${'val_' + field.name}" th:name="${'val_' + field.name}" th:text="${@trackerService.display(field,datas)}">
+</textarea>
 </th:block>
 <th:block th:if="${field.fieldWidget=='DropDown'}">
 <select th:class="${fieldclass}" type='text' th:id="${'val_' + field.name}" th:name="${'val_' + field.name}">
@@ -171,4 +173,29 @@ $('#val_[(${field.name})]').select2({
     </a>
 </li>
 </ul>
+</div>
+
+<div th:fragment="trackerfilter(tracker)" class="card acard mt-2 mt-lg-3" th:if="${(tracker.searchFields!=null and #strings.length(tracker.searchFields)>0) or (tracker.filterFields!=null and #strings.length(tracker.filterFields)>0)}">
+ <div class="card-body px-3 pb-1">
+  <form class="mt-lg-3">
+  	<div th:each="field,iter: ${@trackerService.field_list(tracker,'filter',null)}" class="form-group row" th:if="${tracker.filterFields!=null and #strings.length(tracker.filterFields)>0}">
+  		<div class="mb-1 mb-sm-0 col-sm-3 col-form-label text-sm-right pr-0">        	
+  			<label><span th:text="${field.label}">Search</span>:</label>
+  		</div>
+  		<div class="col-sm-9 input-floating-label text-blue-d2 brc-blue-m1">
+  			<select th:name="${'opt_' + field.name}" th:id="${'opt_' + field.name}" onchange="submit();">
+  				<option th:each="option,optiter: ${@trackerService.filter_options(field)}" th:value="${option.get('val')}" th:text="${option.get('label')}" th:selected="${param.get('opt_' + field.name)?.toString()==option.get('val')?.toString()}" th:readonly="${param.get('opt_' + field.name)==option.get('val')}" >One</option>  				
+  			</select>
+  		</div>
+  	</div>
+  	<div class="form-group row" th:if="${tracker.searchFields!=null and #strings.length(tracker.searchFields)>0}">
+  		<div class="mb-1 mb-sm-0 col-sm-3 col-form-label text-sm-right pr-0">        	
+  			<label>Search:</label>
+  		</div>
+  		<div class="col-sm-9 input-floating-label text-blue-d2 brc-blue-m1">
+  			<input type='text' name='q' th:value="${param.q}"/><button class="btn btn-primary m-1">Search</button>
+  		</div>
+  	</div>
+  </form>
+ </div>
 </div>

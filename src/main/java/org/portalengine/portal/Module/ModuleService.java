@@ -33,6 +33,7 @@ import org.portalengine.portal.User.User;
 import org.portalengine.portal.User.UserService;
 import org.portalengine.portal.Tree.TreeNode;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.jdbc.support.rowset.SqlRowSet;
@@ -50,8 +51,13 @@ import org.thymeleaf.templateresolver.StringTemplateResolver;
 import com.fasterxml.jackson.core.JsonGenerationException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.core.util.DefaultIndenter;
+import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
+import groovy.lang.Binding;
+import groovy.lang.GroovyShell;
 
 @Service
 public class ModuleService {
@@ -88,6 +94,9 @@ public class ModuleService {
 	
 	@Autowired
 	private NamedParameterJdbcTemplate namedjdbctemplate;
+	
+	@Autowired
+	private Environment env;
 	
 	@Autowired
 	private JdbcTemplate jdbctemplate;
@@ -136,15 +145,19 @@ public class ModuleService {
 		
 		List<Page> pages = null;
 		try {
-			pages = objectMapper.readValue(new File(mod_path + "pages.json"), new TypeReference<List<Page>>() {});
-			if(pages.size()>0) {
-				pages.forEach(page -> {					
-					Page curp = pageService.getRepo().findOneByModuleAndSlug(page.getModule(), page.getSlug());
-					if(curp!=null) {
-						page.setId(curp.getId());
-					}
-					pageService.getRepo().save(page);
-				});
+			File pagefile = new File(mod_path + "pages.json");
+			if(pagefile.exists()){
+				pages = objectMapper.readValue(pagefile, new TypeReference<List<Page>>() {});
+				if(pages.size()>0) {
+					pages.forEach(page -> {					
+						Page curp = pageService.getRepo().findOneByModuleAndSlug(page.getModule(), page.getSlug());
+						if(curp!=null) {
+							page.setId(curp.getId());
+						}
+						pageService.getRepo().save(page);					
+					});
+					pageService.getRepo().flush();
+				}
 			}
 		} catch (JsonMappingException e1) {
 			// TODO Auto-generated catch block
@@ -159,15 +172,19 @@ public class ModuleService {
 		
 		List<FileLink> files = null;
 		try {
-			files = objectMapper.readValue(new File(mod_path + "files.json"), new TypeReference<List<FileLink>>() {});
-			if(files.size()>0) {
-				files.forEach(cfile -> {
-					FileLink ccfile = fileService.getRepo().findOneByModuleAndSlug(cfile.getModule(), cfile.getSlug());
-					if(ccfile!=null) {
-						cfile.setId(ccfile.getId());
-					}
-					fileService.getRepo().save(cfile);
-				});
+			File filefile = new File(mod_path + "files.json");
+			if(filefile.exists()) {
+				files = objectMapper.readValue(filefile, new TypeReference<List<FileLink>>() {});
+				if(files.size()>0) {
+					files.forEach(cfile -> {
+						FileLink ccfile = fileService.getRepo().findOneByModuleAndSlug(cfile.getModule(), cfile.getSlug());
+						if(ccfile!=null) {
+							cfile.setId(ccfile.getId());
+						}
+						fileService.getRepo().save(cfile);
+					});
+					fileService.getRepo().flush();
+				}
 			}
 		} catch (JsonMappingException e1) {
 			// TODO Auto-generated catch block
@@ -182,37 +199,41 @@ public class ModuleService {
 		
 		List<Tracker> trackers = null;
 		try {
-			 trackers = objectMapper.readValue(new File(mod_path + "trackers.json"), new TypeReference<List<Tracker>>() {});
-			 if(trackers.size()>0) {
-				 trackers.forEach(ctracker -> {
-					 Tracker cctracker = trackerService.getRepo().findOneByModuleAndSlug(ctracker.getModule(), ctracker.getSlug());
-					 if(cctracker!=null) {
-						 ctracker.setId(cctracker.getId());
-					 }
-					 List<TrackerField> fields = new ArrayList<TrackerField>();
-					 ctracker.getFields().forEach(cfield -> {						 
+			File trackerfile = new File(mod_path + "trackers.json");
+			if(trackerfile.exists()) {
+				 trackers = objectMapper.readValue(trackerfile, new TypeReference<List<Tracker>>() {});
+				 if(trackers.size()>0) {
+					 trackers.forEach(ctracker -> {
+						 Tracker cctracker = trackerService.getRepo().findOneByModuleAndSlug(ctracker.getModule(), ctracker.getSlug());
 						 if(cctracker!=null) {
-							 TrackerField prevfield = trackerService.getFieldRepo().findByTrackerAndName(cctracker, cfield.getName());
-							 if(prevfield!=null) {
-								 cfield.setId(prevfield.getId());
-							 }
-							 else {
-								 cfield.setId(null);
-							 }
-						 }						 
-						 fields.add(cfield);
+							 ctracker.setId(cctracker.getId());
+						 }
+						 List<TrackerField> fields = new ArrayList<TrackerField>();
+						 ctracker.getFields().forEach(cfield -> {						 
+							 if(cctracker!=null) {
+								 TrackerField prevfield = trackerService.getFieldRepo().findByTrackerAndName(cctracker, cfield.getName());
+								 if(prevfield!=null) {
+									 cfield.setId(prevfield.getId());
+								 }
+								 else {
+									 cfield.setId(null);
+								 }
+							 }						 
+							 fields.add(cfield);
+						 });
+						 if(cctracker==null) {
+							 ctracker.setFields(null);
+						 }
+						 trackerService.getRepo().save(ctracker);
+						 trackerService.getRepo().flush();
+						 final Tracker fctracker = trackerService.getRepo().findOneByModuleAndSlug(ctracker.getModule(), ctracker.getSlug());					 
+						 fields.forEach(cfield -> {
+							 cfield.setTracker(fctracker);						 
+							 trackerService.getFieldRepo().save(cfield);						
+						 });
+						 trackerService.getFieldRepo().flush();					 
 					 });
-					 if(cctracker==null) {
-						 ctracker.setFields(null);
-					 }
-					 trackerService.getRepo().save(ctracker);
-					 final Tracker fctracker = trackerService.getRepo().findOneByModuleAndSlug(ctracker.getModule(), ctracker.getSlug());					 
-					 fields.forEach(cfield -> {
-						 cfield.setTracker(fctracker);						 
-						 trackerService.getFieldRepo().save(cfield);						
-					 });		 
-					 
-				 });
+				 }
 			 }
 		} catch (JsonMappingException e1) {
 			// TODO Auto-generated catch block
@@ -227,15 +248,19 @@ public class ModuleService {
 		
 		List<Setting> settings = null;
 		try {
-			settings = objectMapper.readValue(new File(mod_path + "settings.json"), new TypeReference<List<Setting>>() {});
-			if(settings.size()>0) {
-				settings.forEach(csetting -> {
-					Setting ccsetting = settingService.getRepo().findOneByModuleAndName(csetting.getModule(), csetting.getName());
-					if(ccsetting!=null) {
-						csetting.setId(ccsetting.getId());
-					}
-					settingService.getRepo().save(csetting);
-				});
+			File settingfile = new File(mod_path + "settings.json");
+			if(settingfile.exists()) {
+				settings = objectMapper.readValue(settingfile, new TypeReference<List<Setting>>() {});
+				if(settings.size()>0) {
+					settings.forEach(csetting -> {
+						Setting ccsetting = settingService.getRepo().findOneByModuleAndName(csetting.getModule(), csetting.getName());
+						if(ccsetting!=null) {
+							csetting.setId(ccsetting.getId());
+						}
+						settingService.getRepo().save(csetting);
+					});
+					settingService.getRepo().flush();
+				}
 			}
 		} catch (JsonMappingException e1) {
 			// TODO Auto-generated catch block
@@ -250,48 +275,53 @@ public class ModuleService {
 			
 		List<Tree> trees = null;
 		try {
-			trees = objectMapper.readValue(new File(mod_path + "trees.json"), new TypeReference<List<Tree>>() {});
-			if(trees.size()>0) {
-				trees.forEach(ctree -> {
-					Tree cctree = treeService.getTreeRepo().findOneByModuleAndSlug(ctree.getModule(), ctree.getSlug());
-					if(cctree!=null) {
-						ctree.setId(cctree.getId());
-					}
-					
-					List<TreeNode> nodes = new ArrayList<TreeNode>();					
-					ctree.getNodes().forEach(cnode -> {						
+			File treefile = new File(mod_path + "trees.json");
+			if(treefile.exists()) {
+				trees = objectMapper.readValue(treefile, new TypeReference<List<Tree>>() {});
+				if(trees.size()>0) {
+					trees.forEach(ctree -> {
+						Tree cctree = treeService.getTreeRepo().findOneByModuleAndSlug(ctree.getModule(), ctree.getSlug());
 						if(cctree!=null) {
-							TreeNode prevnode = treeService.getNodeRepo().findBySlugAndParent(cnode.getSlug(), cnode.getParent());
-							if(prevnode!=null) {
-								treeService.getNodeRepo().delete(prevnode);
-							}							
-						}						
-						nodes.add(cnode);						
+							ctree.setId(cctree.getId());
+						}
+						
+						List<TreeNode> nodes = new ArrayList<TreeNode>();					
+						ctree.getNodes().forEach(cnode -> {						
+							if(cctree!=null) {
+								TreeNode prevnode = treeService.getNodeRepo().findBySlugAndParent(cnode.getSlug(), cnode.getParent());
+								if(prevnode!=null) {
+									treeService.getNodeRepo().delete(prevnode);
+								}							
+							}						
+							nodes.add(cnode);						
+						});
+						
+						ctree.setNodes(new ArrayList<TreeNode>());
+						
+						treeService.getTreeRepo().save(ctree);
+						treeService.getTreeRepo().flush();
+						
+						final Tree fctree = treeService.getTreeRepo().findOneByModuleAndSlug(ctree.getModule(), ctree.getSlug());
+						nodes.forEach(cnode -> {						
+							cnode = fixNode(cnode,fctree);
+							TreeNode prevnode = treeService.getNodeRepo().findFirstByFullPathAndTree(cnode.getFullPath(), fctree);
+							if(prevnode==null) {							
+								TreeNode saved = treeService.getNodeRepo().save(cnode);
+								cnode.getChildren().forEach(child->{
+									child.setParent(saved);
+									TreeNode savedchild = treeService.getNodeRepo().save(child);
+								});
+							}
+							else {
+								cnode.getChildren().forEach(child->{
+									child.setParent(prevnode);
+									TreeNode savedchild = treeService.getNodeRepo().save(child);
+								});
+							}
+						});					
+						treeService.getNodeRepo().flush();
 					});
-					
-					ctree.setNodes(new ArrayList<TreeNode>());
-					
-					treeService.getTreeRepo().save(ctree);
-					
-					final Tree fctree = treeService.getTreeRepo().findOneByModuleAndSlug(ctree.getModule(), ctree.getSlug());
-					nodes.forEach(cnode -> {						
-						cnode = fixNode(cnode,fctree);
-						TreeNode prevnode = treeService.getNodeRepo().findFirstByFullPathAndTree(cnode.getFullPath(), fctree);
-						if(prevnode==null) {							
-							TreeNode saved = treeService.getNodeRepo().save(cnode);
-							cnode.getChildren().forEach(child->{
-								child.setParent(saved);
-								TreeNode savedchild = treeService.getNodeRepo().save(child);
-							});
-						}
-						else {
-							cnode.getChildren().forEach(child->{
-								child.setParent(prevnode);
-								TreeNode savedchild = treeService.getNodeRepo().save(child);
-							});
-						}
-					});					
-				});
+				}
 			}
 		} catch (JsonMappingException e1) {
 			// TODO Auto-generated catch block
@@ -302,11 +332,13 @@ public class ModuleService {
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
-		}
+		}		
 	}
 	
 	public void exportModule(String module) {
 		ObjectMapper objectMapper = new ObjectMapper();
+		DefaultPrettyPrinter printer = new DefaultPrettyPrinter()
+	            .withObjectIndenter(new DefaultIndenter("  ", "\n"));
 		String cwd = new File("").getAbsolutePath() + "/custom_modules";
 		String prepend = settingService.StringSetting("module_folder",cwd);
 		String mod_path = prepend + "/" + module + "/";
@@ -316,8 +348,11 @@ public class ModuleService {
 		}
 		
 		List<Page> pages = pageService.getRepo().findAllByModule(module);
-		try {
-			objectMapper.writeValue(new File(mod_path + "pages.json"), pages);
+		try {			
+			Path path = Paths.get(mod_path + "pages.json");
+			byte[] data = objectMapper.writer(printer).writeValueAsBytes(pages);		
+			Files.write(path, data);
+			
 		} catch (JsonGenerationException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -331,7 +366,9 @@ public class ModuleService {
 		
 		List<FileLink> files = fileService.getRepo().findAllByModule(module);
 		try {
-			objectMapper.writeValue(new File(mod_path + "files.json"), files);
+			Path path = Paths.get(mod_path + "files.json");
+			byte[] data = objectMapper.writer(printer).writeValueAsBytes(files);		
+			Files.write(path, data);
 		} catch (JsonGenerationException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -345,7 +382,9 @@ public class ModuleService {
 		
 		List<Tracker> trackers = trackerService.getRepo().findAllByModule(module);
 		try {
-			objectMapper.writeValue(new File(mod_path + "trackers.json"), trackers);
+			Path path = Paths.get(mod_path + "trackers.json");
+			byte[] data = objectMapper.writer(printer).writeValueAsBytes(trackers);		
+			Files.write(path, data);
 		} catch (JsonGenerationException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -359,7 +398,9 @@ public class ModuleService {
 		
 		List<Setting> settings = settingService.getRepo().findAllByModule(module);
 		try {
-			objectMapper.writeValue(new File(mod_path + "settings.json"), settings);
+			Path path = Paths.get(mod_path + "settings.json");
+			byte[] data = objectMapper.writer(printer).writeValueAsBytes(settings);		
+			Files.write(path, data);
 		} catch (JsonGenerationException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -373,7 +414,9 @@ public class ModuleService {
 		
 		List<Tree> trees = treeService.getTreeRepo().findAllByModule(module);
 		try {
-			objectMapper.writeValue(new File(mod_path + "trees.json"), trees);
+			Path path = Paths.get(mod_path + "trees.json");
+			byte[] data = objectMapper.writer(printer).writeValueAsBytes(trees);		
+			Files.write(path, data);
 		} catch (JsonGenerationException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();

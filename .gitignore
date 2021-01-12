@@ -34,3 +34,10 @@ src/main/resources/application.properties
 ### VIM ###
 *~
 *.swp
+
+### H2 DB ###
+*.db
+
+/custom_modules
+
+docs/_build/
