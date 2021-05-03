@@ -7,6 +7,7 @@ import org.portalengine.portal.User.Message.UserMessage;
 import org.portalengine.portal.User.Message.UserMessageRepository;
 import org.portalengine.portal.User.Notification.UserNotification;
 import org.portalengine.portal.User.Notification.UserNotificationRepository;
+import org.portalengine.portal.User.Role.UserRole;
 import org.portalengine.portal.User.Role.UserRoleRepository;
 import org.portalengine.portal.User.Task.UserTask;
 import org.portalengine.portal.User.Task.UserTaskRepository;
@@ -16,6 +17,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import lombok.Data;
@@ -38,6 +40,9 @@ public class UserService implements UserDetailsService {
 	
 	@Autowired
 	private UserRoleRepository roleRepo;
+	
+	@Autowired
+	private PasswordEncoder passwordEncoder;
 
 	@Autowired
 	public UserService() {
@@ -51,6 +56,26 @@ public class UserService implements UserDetailsService {
 			return user;
 		}
 		throw new UsernameNotFoundException("User '" + username + "' not found");
+	}
+	
+	public boolean hasRole(User curuser, String module, String role) {
+		UserRole userRole = roleRepo.findByUserAndModuleAndRoleIgnoreCase(curuser, module, role);
+		if(userRole != null && userRole instanceof UserRole) {
+			return true;
+		}
+		else {
+			return false;
+		}
+	}
+	
+	public boolean hasRole(User curuser, String module) {
+		List<UserRole> userRoles = roleRepo.findByUserAndModuleIgnoreCase(curuser, module);
+		if(userRoles.size()>0) {
+			return true;
+		}
+		else {
+			return false;
+		}
 	}
 
 	public List<UserNotification> currentNotifications() {
@@ -67,13 +92,17 @@ public class UserService implements UserDetailsService {
 	
 	public User currentUser() {
 		Object secuser = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-		if(secuser!=null){
-			User duser = repo.findById(((User)secuser).getId()).orElse(null);			
-			return duser;
+		if(secuser!=null && secuser instanceof User){	
+			return (User)secuser;
 		}
 		else{
 			return null;
 		}
+	}
+	
+	public User setPassword(User user,String password) {
+		user.setPassword(passwordEncoder.encode(password));
+		return user;
 	}
 	
 	public List<UserMessage> currentMessages() {

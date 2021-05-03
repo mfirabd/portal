@@ -58,6 +58,7 @@ public class PageService {
 	public String getTemplateFromMap(String htmlContent, Map<String, Object> dynamicAttributesMap) {
 
 		String template = null;
+		
 		final WebContext wctx = new WebContext(request, response, servletContext);
 		
 		if(!CollectionUtils.isEmpty(dynamicAttributesMap)) {
@@ -74,21 +75,26 @@ public class PageService {
 	
 	public String renderPage(String slug) {		
 		try {
-			Page curpage = this.repo.findOneByModuleAndSlug("portal", slug);
+			PortalPage curpage = this.repo.findOneByModuleAndSlug("portal", slug);
 			if(curpage!=null) {
-				return getTemplateFromMap(curpage.getContent(), null);
+				String toreturn = getTemplateFromMap(curpage.getContent(), null);
+				if(toreturn.trim().length()>0) {
+					return toreturn;
+				}
+				else {					
+					return "<!-- -->";
+				}
 			}
 		}
 		catch(Exception exp) {
 			System.out.println("Slug not found:" + slug);
-		}
-		
+		}		
 		return "<!-- -->";
 	}
 	
 	public boolean pageExist(String slug) {
 		try {
-			Page curpage = this.repo.findOneByModuleAndSlug("portal", slug);
+			PortalPage curpage = this.repo.findOneByModuleAndSlug("portal", slug);
 			if(curpage!=null) {
 				return true;
 			}
@@ -101,7 +107,14 @@ public class PageService {
 	
 	public String urlParamUpdate(String param, String value) {		
 		ServletUriComponentsBuilder urlBuilder = ServletUriComponentsBuilder.fromCurrentRequest();
-		urlBuilder.replaceQueryParam(param, value);
+		urlBuilder.replaceQueryParam(param, value);		
+		String result = urlBuilder.build().toUriString();
+		return result;
+	}
+	
+	public String urlChangePath(String newPath) {
+		ServletUriComponentsBuilder urlBuilder = ServletUriComponentsBuilder.fromCurrentRequest();
+		urlBuilder.replacePath(newPath);		
 		String result = urlBuilder.build().toUriString();
 		return result;
 	}

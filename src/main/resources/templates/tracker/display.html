@@ -54,24 +54,67 @@
 			<div class='col-sm font-bold text-sm-right'>Node:</div>
 			<div class='col-sm' th:text="${tracker.nodeId}">tail_table</div>
 		</div>
+		
+		<div class='row'>
+			<div class='col-sm font-bold text-sm-right'>View List Roles:</div>
+			<div class='col-sm' th:text="${tracker.viewListRoles}">dataTable</div>
+			<div class='col-sm font-bold text-sm-right'>New Record Roles:</div>
+			<div class='col-sm' th:text="${tracker.addRoles}">tail_table</div>
+		</div>
+		
+		<div class='row'>
+			<div class='col-sm font-bold text-sm-right'>Edit Roles:</div>
+			<div class='col-sm' th:text="${tracker.editRoles}">dataTable</div>
+			<div class='col-sm font-bold text-sm-right'>Delete Roles:</div>
+			<div class='col-sm' th:text="${tracker.deleteRoles}">tail_table</div>
+		</div>
+		
+		<div class='row'>
+			<div class='col-sm font-bold text-sm-right'>View Detail Roles:</div>
+			<div class='col-sm' th:text="${tracker.detailRoles}">dataTable</div>
+			<div class='col-sm font-bold text-sm-right'>Default Status:</div>
+			<div class='col-sm' th:text="${tracker.defaultStatus}">tail_table</div>
+		</div>
+		
+		<div class='row'>
+			<div class='col-sm font-bold text-sm-right'>Post Create:</div>
+			<div class='col-sm' th:text="${tracker.postCreate}">dataTable</div>
+			<div class='col-sm font-bold text-sm-right'>Post Edit:</div>
+			<div class='col-sm' th:text="${tracker.postEdit}">tail_table</div>
+		</div>
+		
+		<div class='row'>
+			<div class='col-sm font-bold text-sm-right'>Post Delete:</div>
+			<div class='col-sm' th:text="${tracker.postDelete}">dataTable</div>
+			<div class='col-sm font-bold text-sm-right'>Post Data Update:</div>
+			<div class='col-sm' th:text="${tracker.postDataUpdate}">tail_table</div>			
+		</div>
 
 		<div class='row'>
 			<div class='col-sm font-bold text-sm-right'>List Fields:</div>
-			<div class='col-sm' th:text="${tracker.listFields}">dataTable</div>
+			<div class='col-sm-9' th:text="${tracker.listFields?.replace(',',', ')}">dataTable</div>
+		</div>
+		<div class='row'>
+			<div class='col-sm font-bold text-sm-right'>Excel Fields:</div>
+			<div class='col-sm-9' th:text="${tracker.excelFields?.replace(',',', ')}">dataTable</div>
+		</div>
+		<div class='row'>
 			<div class='col-sm font-bold text-sm-right'>Search Fields:</div>
-			<div class='col-sm' th:text="${tracker.searchFields}">dataTable</div>
+			<div class='col-sm-9' th:text="${tracker.searchFields?.replace(',',', ')}">dataTable</div>
 		</div>
 
 		<div class='row'>
 			<div class='col-sm font-bold text-sm-right'>Display Fields:</div>
-			<div class='col-sm' th:text="${tracker.displayFields}">dataTable</div>
+			<div class='col-sm-9' th:text="${tracker.displayFields?.replace(',',', ')}">dataTable</div>
+		</div>
+		<div class='row'>
 			<div class='col-sm font-bold text-sm-right'>Filter Fields:</div>
-			<div class='col-sm' th:text="${tracker.filterFields}">dataTable</div>
+			<div class='col-sm-9' th:text="${tracker.filterFields?.replace(',',', ')}">dataTable</div>
 		</div>
 
 		<div class='row'>
 			<div class='col-sm font-bold text-sm-right'>Form Fields:</div>
-			<div class='col-sm-9' th:text="${tracker.formFields}">dataTable</div>
+			<div class='col-sm-9' th:text="${tracker.formFields?.replace(',',', ')}">dataTable</div>
 		</div>
 
 	</div>

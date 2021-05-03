@@ -20,9 +20,13 @@ import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.portalengine.portal.PoiExcel;
 import org.portalengine.portal.FileLink.FileLinkService;
+import org.portalengine.portal.Page.PageService;
+import org.portalengine.portal.Page.PortalPage;
 import org.portalengine.portal.Tracker.Field.TrackerField;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.rowset.SqlRowSet;
 import org.springframework.stereotype.Controller;
@@ -43,6 +47,9 @@ public class TrackerController {
 		
 		@Autowired
 		private FileLinkService fileservice;
+		
+		@Autowired
+		private PageService pageService;
 		
 		private DataSource datasource;
 		
@@ -66,7 +73,28 @@ public class TrackerController {
 				size = Integer.parseInt(request.getParameter("size"));
 			}
 			model.addAttribute("pageTitle","Tracker Listing");
-			model.addAttribute("trackers", service.getRepo().findAll(PageRequest.of(page, size)));
+			
+			String search = "";
+			Page<Tracker> toreturn = null;
+			if(request.getParameter("q")!=null||(request.getParameter("module")!=null && !request.getParameter("module").equals("All"))) {
+				System.out.println("doing query");
+				String module = request.getParameter("module");
+				search = "%" + request.getParameter("q").replace(" " , "%") + "%";
+				Pageable pageable = PageRequest.of(page, size);
+				if(module.equals("All")) {
+					toreturn = service.getRepo().apiquery(search,pageable);
+				}
+				else {
+					toreturn = service.getRepo().apimodulequery(search, module, pageable);
+				}
+			}
+			else {
+				toreturn = service.getRepo().findAll(PageRequest.of(page, size));
+			}
+			
+			model.addAttribute("trackers", toreturn);
+			
+			//model.addAttribute("trackers", service.getRepo().findAll(PageRequest.of(page, size)));
 			return "tracker/list.html";
 		}
 		
@@ -76,6 +104,10 @@ public class TrackerController {
 				Tracker tracker = service.getRepo().getOne(id);
 				model.addAttribute("pageTitle","Edit Tracker - " + tracker.getName());
 				model.addAttribute("tracker", tracker);
+				model.addAttribute("postCreate",pageService.getRepo().findOneByModuleAndSlug(tracker.getModule(),tracker.getPostCreate()));
+				model.addAttribute("postEdit",pageService.getRepo().findOneByModuleAndSlug(tracker.getModule(),tracker.getPostEdit()));
+				model.addAttribute("postDelete",pageService.getRepo().findOneByModuleAndSlug(tracker.getModule(),tracker.getPostDelete()));
+				model.addAttribute("postDataUpdate",pageService.getRepo().findOneByModuleAndSlug(tracker.getModule(),tracker.getPostDataUpdate()));
 			}
 			else {
 				model.addAttribute("pageTitle","Create Tracker");

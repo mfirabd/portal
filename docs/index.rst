@@ -7,7 +7,7 @@ Welcome to Java Portal Framework's documentation!
 =================================================
 
 The Java Portal Framework(JPF) is a framework for creating dynamic and easy to update portal that has 
-complicated and customized workflow and processes.
+complicated and customized workflow and processes. You can download the source code from `github <https://github.com/abdza/portal>`_. 
 
 It consists of the following components:
   - Pages
@@ -28,6 +28,7 @@ they are Admin of but only view or download information from modules where they 
    files/intro
    trees/intro
    trackers/intro
+   examples/intro
    todos
 
 

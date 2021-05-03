@@ -7,7 +7,10 @@ import org.portalengine.portal.Tracker.Tracker;
 import org.portalengine.portal.Tree.Tree;
 import org.portalengine.portal.Tree.TreeNode;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -24,13 +27,12 @@ public class UserController {
 	@Autowired
 	private UserService service;
 	
+	/* Read application.properties with the following function:
+	 * String keyValue = env.getProperty(key);
+	 */
 	@Autowired
-	private PasswordEncoder passwordEncoder;
-	
-	@Autowired
-	public UserController() {
-	}
-	
+	private Environment env;
+		
 	@GetMapping("/update_password")
 	public String updatePassword(UpdatePasswordForm updatePasswordForm, Model model) {
 		model.addAttribute("pageTitle","User Profile");
@@ -59,7 +61,7 @@ public class UserController {
 		}
 		
 		User curuser = service.currentUser();
-		curuser.setPassword(passwordEncoder.encode(updatePasswordForm.getPassword()));
+		curuser.setPassword(service.getPasswordEncoder().encode(updatePasswordForm.getPassword()));
 		service.getRepo().save(curuser);
 		
 		return "redirect:/profile";
@@ -74,13 +76,22 @@ public class UserController {
 	
 	@GetMapping("/register")
 	public String registerPage(Model model) {
+		String enable_register = env.getProperty("jpf.enable_register");
+		if(enable_register!=null && enable_register.toLowerCase().trim().equals("true")) {
 		model.addAttribute("pageTitle","New User Registration");
-		return "user/register.html";
+			return "user/register.html";
+		}
+		else {
+			return "redirect:/";
+		}
 	}
 	
 	@PostMapping("/register")
 	public String register(@Valid RegistrationForm userreg, Model model) {
-		service.getRepo().save(userreg.toUser(this.passwordEncoder,service));
+		String enable_register = env.getProperty("jpf.enable_register");
+		if(enable_register!=null && enable_register.toLowerCase().trim().equals("true")) {
+			service.getRepo().save(userreg.toUser(service.getPasswordEncoder(),service));
+		}
 		return "redirect:/";
 	}
 	
@@ -95,7 +106,20 @@ public class UserController {
 			size = Integer.parseInt(request.getParameter("size"));
 		}
 		model.addAttribute("pageTitle","User Listing");
-		model.addAttribute("users", service.getRepo().findAll(PageRequest.of(page, size)));
+		
+		String search = "";
+		Page<User> toreturn = null;
+		if(request.getParameter("q")!=null) {
+			search = "%" + request.getParameter("q").replace(" " , "%") + "%";		
+			Pageable pageable = PageRequest.of(page, size);
+			toreturn = service.getRepo().apiquery(search,pageable);
+		}
+		else {
+			toreturn = service.getRepo().findAll(PageRequest.of(page, size));
+		}
+		
+		model.addAttribute("users", toreturn);
+		
 		return "user/list.html";
 	}
 	
@@ -123,7 +147,7 @@ public class UserController {
 	
 	@PostMapping("/admin/users/save")
 	public String save(@Valid RegistrationForm userreg,Model model) {
-		service.getRepo().save(userreg.toUser(this.passwordEncoder,service));
+		service.getRepo().save(userreg.toUser(service.getPasswordEncoder(),service));
 		return "redirect:/admin/users";
 	}
 	

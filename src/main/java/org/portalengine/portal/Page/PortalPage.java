@@ -17,7 +17,7 @@ import lombok.Data;
 @Data
 @Entity
 @Table(name = "portal_page")
-public class Page extends Auditable<String> {
+public class PortalPage extends Auditable<String> {
 	
 	@Id
 	@GeneratedValue(strategy=GenerationType.AUTO)
@@ -36,9 +36,16 @@ public class Page extends Auditable<String> {
 	
 	private Boolean runable;
 	
+	private Boolean requireLogin;
+	
+	private String allowedRoles;
+	
 	@NotNull
 	@org.hibernate.annotations.Type( type = "text" )
-	private String content;	
+	private String content;
+	
+	@org.hibernate.annotations.Type( type = "text" )
+	private String pageData;
 	
 	private Boolean published;
 	

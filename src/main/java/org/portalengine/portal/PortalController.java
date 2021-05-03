@@ -13,7 +13,7 @@ import javax.servlet.http.HttpServletRequest;
 import org.portalengine.portal.FileLink.FileLink;
 import org.portalengine.portal.FileLink.FileLinkService;
 import org.portalengine.portal.Module.ModuleService;
-import org.portalengine.portal.Page.Page;
+import org.portalengine.portal.Page.PortalPage;
 import org.portalengine.portal.Page.PageService;
 import org.portalengine.portal.Setting.SettingService;
 import org.portalengine.portal.Tracker.Tracker;
@@ -31,6 +31,10 @@ import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -51,6 +55,9 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.tags.Param;
+
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
 
 import groovy.lang.Binding;
 import groovy.lang.GroovyShell;
@@ -86,6 +93,12 @@ public class PortalController {
 	@Autowired
 	private SettingService settingService;
 	
+	@Autowired
+	private NamedParameterJdbcTemplate namedjdbctemplate;
+	
+	@Autowired
+    private JavaMailSender javaMailSender;
+	
 	/* Read application.properties with the following function:
 	 * String keyValue = env.getProperty(key);
 	 */
@@ -96,6 +109,21 @@ public class PortalController {
 	public PortalController() {
 	}
 	
+	@GetMapping("/testemail")
+	public String testemail(Model model) {
+		System.out.println("In email");
+		
+		SimpleMailMessage msg = new SimpleMailMessage();
+        msg.setTo("abdullah.zainul@gmail.com");
+
+        msg.setSubject("Testing from Spring Boot");
+        msg.setText("Hello World \n Spring Boot Email");
+
+        javaMailSender.send(msg);
+        
+		return "redirect:/";
+	}
+	
 	@GetMapping("/login")
 	public String login(Model model) {
 		model.addAttribute("pageTitle","Login");
@@ -104,7 +132,7 @@ public class PortalController {
 	
 	@GetMapping("/")
 	public String home(Model model) {
-		Page curpage = pageService.getRepo().findOneByModuleAndSlug("portal", "home");
+		PortalPage curpage = pageService.getRepo().findOneByModuleAndSlug("portal", "home");
 		model.addAttribute("pageTitle",settingService.StringSetting("home_title", "Home"));
 		if(curpage!=null) {			
 			model.addAttribute("page", curpage);
@@ -155,7 +183,7 @@ public class PortalController {
 				for(Tracker tracker : trackers) {					
 					trackerService.updateDb(tracker);
 				}	
-				Page curpage = pageService.getRepo().findOneByModuleAndSlug(module, "post_module_import");
+				PortalPage curpage = pageService.getRepo().findOneByModuleAndSlug(module, "post_module_import");
 				if(curpage!=null) {
 					System.out.println("Found post import page for " + module);
 					if(curpage.getRunable()) {				
@@ -171,6 +199,9 @@ public class PortalController {
 						binding.setVariable("userService",userService);
 						binding.setVariable("fileService",fileService);
 						binding.setVariable("settingService", settingService);
+						binding.setVariable("javaMailSender", javaMailSender);
+						binding.setVariable("passwordEncoder", passwordEncoder);
+						binding.setVariable("namedjdbctemplate", namedjdbctemplate);
 						binding.setVariable("env", env);				
 						Object content = null;
 						try {
@@ -200,7 +231,7 @@ public class PortalController {
 			else {
 				slg = post_setup_page.trim();
 			}			
-			Page curpage = pageService.getRepo().findOneByModuleAndSlug(mdl, slg);
+			PortalPage curpage = pageService.getRepo().findOneByModuleAndSlug(mdl, slg);
 			if(curpage!=null) {			
 				return "redirect:/view/" + mdl + "/" + slg;
 			}
@@ -215,7 +246,7 @@ public class PortalController {
 		if(module==null) {
 			module = "portal";
 		}
-		Page curpage = pageService.getRepo().findOneByModuleAndSlug(module, slug);				
+		PortalPage curpage = pageService.getRepo().findOneByModuleAndSlug(module, slug);				
 		if(curpage!=null) {
 			if(curpage.getRunable()) {				
 				Binding binding = new Binding();		
@@ -229,6 +260,9 @@ public class PortalController {
 				binding.setVariable("userService",userService);
 				binding.setVariable("fileService",fileService);
 				binding.setVariable("settingService", settingService);
+				binding.setVariable("javaMailSender", javaMailSender);
+				binding.setVariable("passwordEncoder", passwordEncoder);
+				binding.setVariable("namedjdbctemplate", namedjdbctemplate);
 				binding.setVariable("env", env);
 				binding.setVariable("arg1", arg1);
 				binding.setVariable("arg2", arg2);
@@ -260,7 +294,7 @@ public class PortalController {
 		if(module==null) {
 			module = "portal";
 		}
-		Page curpage = pageService.getRepo().findOneByModuleAndSlug(module, slug);				
+		PortalPage curpage = pageService.getRepo().findOneByModuleAndSlug(module, slug);				
 		if(curpage!=null) {
 			if(curpage.getRunable()) {				
 				Binding binding = new Binding();		
@@ -274,6 +308,9 @@ public class PortalController {
 				binding.setVariable("userService",userService);
 				binding.setVariable("fileService",fileService);
 				binding.setVariable("settingService", settingService);
+				binding.setVariable("javaMailSender", javaMailSender);
+				binding.setVariable("passwordEncoder", passwordEncoder);
+				binding.setVariable("namedjdbctemplate", namedjdbctemplate);
 				binding.setVariable("env", env);
 				binding.setVariable("arg1", arg1);
 				binding.setVariable("arg2", arg2);
@@ -300,11 +337,13 @@ public class PortalController {
 	}
 	
 	@RequestMapping(path={"/view/{slug}","/view/{module}/{slug}","/view/{module}/{slug}/{arg1}","/view/{module}/{slug}/{arg1}/{arg2}","/view/{module}/{slug}/{arg1}/{arg2}/{arg3}","/view/{module}/{slug}/{arg1}/{arg2}/{arg3}/{arg4}","/view/{module}/{slug}/{arg1}/{arg2}/{arg3}/{arg4}/{arg5}"},method={ RequestMethod.GET, RequestMethod.POST })
-	public String viewPage(@PathVariable(required=false) String module, @PathVariable String slug, Model model,HttpServletRequest request,@PathVariable(required=false) String arg1,@PathVariable(required=false) String arg2,@PathVariable(required=false) String arg3,@PathVariable(required=false) String arg4,@PathVariable(required=false) String arg5) {		
+	@PreAuthorize("pagePermission(#module,#slug)")
+	public String viewPage(@PathVariable(required=false) String module, @PathVariable String slug, Model model,HttpServletRequest request,@PathVariable(required=false) String arg1,@PathVariable(required=false) String arg2,@PathVariable(required=false) String arg3,@PathVariable(required=false) String arg4,@PathVariable(required=false) String arg5) {
+		
 		if(module==null) {
 			module = "portal";
 		}
-		Page curpage = pageService.getRepo().findOneByModuleAndSlug(module, slug);
+		PortalPage curpage = pageService.getRepo().findOneByModuleAndSlug(module, slug);
 				
 		if(curpage!=null) {
 			if(curpage.getPublished()!=null && curpage.getPublished()==true) {
@@ -323,6 +362,9 @@ public class PortalController {
 					binding.setVariable("userService",userService);
 					binding.setVariable("fileService",fileService);
 					binding.setVariable("settingService", settingService);	
+					binding.setVariable("javaMailSender", javaMailSender);
+					binding.setVariable("passwordEncoder", passwordEncoder);
+					binding.setVariable("namedjdbctemplate", namedjdbctemplate);
 					binding.setVariable("env", env);
 					binding.setVariable("arg1", arg1);
 					binding.setVariable("arg2", arg2);
@@ -337,6 +379,8 @@ public class PortalController {
 						System.out.println("Error in page:" + e.toString());
 					}
 					if(curpage.getPage_type().equals("Template")) {
+						System.out.println("in template running");
+						System.out.println(content);
 						model.addAttribute("pageTitle","Running " + curpage.getTitle());
 						model.addAttribute("page", curpage);
 						model.addAttribute("content",content);
@@ -354,8 +398,38 @@ public class PortalController {
 					}
 				}
 				else {
+					Object pdata = null;
+					if(curpage.getPageData()!=null && curpage.getPageData().length()>0) {
+						Binding binding = new Binding();		
+						GroovyShell shell = new GroovyShell(getClass().getClassLoader(),binding);
+						Map<String, String[]> postdata = request.getParameterMap();
+						binding.setVariable("pageService",pageService);
+						binding.setVariable("postdata", postdata);
+						binding.setVariable("request", request);
+						binding.setVariable("trackerService",trackerService);
+						binding.setVariable("treeService",treeService);
+						binding.setVariable("userService",userService);
+						binding.setVariable("fileService",fileService);
+						binding.setVariable("settingService", settingService);
+						binding.setVariable("javaMailSender", javaMailSender);
+						binding.setVariable("passwordEncoder", passwordEncoder);
+						binding.setVariable("namedjdbctemplate", namedjdbctemplate);
+						binding.setVariable("env", env);
+						binding.setVariable("arg1", arg1);
+						binding.setVariable("arg2", arg2);
+						binding.setVariable("arg3", arg3);
+						binding.setVariable("arg4", arg4);
+						binding.setVariable("arg5", arg5);
+						try {
+							pdata = shell.evaluate(curpage.getPageData());
+						}
+						catch(Exception e) {
+							System.out.println("Error in page:" + e.toString());
+						}
+					}
 					model.addAttribute("pageTitle",curpage.getTitle());
 					model.addAttribute("page", curpage);
+					model.addAttribute("pdata", pdata);
 					model.addAttribute("content", curpage.getContent());
 					model.addAttribute("env", env);
 					model.addAttribute("arg1",arg1);

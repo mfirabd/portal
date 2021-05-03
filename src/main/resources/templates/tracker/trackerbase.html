@@ -1,8 +1,10 @@
-<table th:fragment="datatable(tracker,dataset)" class="table">
+<table th:fragment="datatable(tracker,dataset)" class="table responsive">
+<thead>
 <tr><th>#</th>
 <th th:each="field,iter: ${@trackerService.field_list(tracker,'list',null)}" th:text="${field.label}">Module</th>
 <th th:if="${@trackerService.listAction(tracker)}">Action</th>
 </tr>
+</thead>
 <tr th:each="datas,iter: ${dataset.dataRows}">
 <td><a href='#' th:text="${iter.count + dataset.number*10}" th:href="${pnode}?@{{requestURI}/t/display/{id}(requestURI=${#request.RequestURL},id=${datas.get('id')?.toString()})}:@{/{module}/{slug}/display/{id}(id=${datas.get('id')},module=${tracker.module},slug=${tracker.slug})}" >2</a></td>
 <td th:each="field,iter: ${@trackerService.field_list(tracker,'list',null)}" th:text="${@trackerService.display(field,datas)}">module</td>
@@ -16,11 +18,16 @@
 
 <div th:fragment="dataform(tracker,datas,transition)" class='dataform'>
 <form method='post' th:action='${pnode}?@{/{portalPath}/save(portalPath=${pnode.portalPath()})}:@{/{module}/{slug}/save(module=${tracker.module},slug=${tracker.slug})}' th:object="${tracker}">
-<input type='hidden' name='id' th:value="${datas.get('id')?.toString()}" th:if="${datas?.get('id')!=null}"/>
+<th:block  th:if="${datas?.get('id')!=null}">
+<input type='hidden' name='id' th:value="${datas.get('id')?.toString()}"/>
+</th:block>
 <input type='hidden' name='transition_id' th:value="${transition.id}" th:if="${transition!=null}"/>
 
 <div th:each="field,iter: ${@trackerService.field_list(tracker,'form',transition)}">
+<input th:if="${field.fieldWidget=='Auto'}" type='hidden' th:id="${'val_' + field.name}" th:name="${'val_' + field.name}" value="auto_field"/>
+<th:block th:unless="${field.fieldWidget=='Auto'}">
 <div th:replace="tracker/trackerbase::dataformfield(tracker=${tracker},datas=${datas},field=${field})"></div>
+</th:block>
 </div>
 
 <div class='form-group row'>
@@ -37,7 +44,7 @@
 
 [# th:each="field,iter: ${@trackerService.field_list(tracker,'form',transition)}" th:if="${field.fieldType=='DateTime'}"]
 $('#val_[(${field.name})]').datetimepicker({
-	[# th:if="${datas}"]date: moment('[(${field.display(datas)})]','DD/MM/YYYY HH:mm:ss'),[/]
+	[# th:if="${datas}"]date: moment('[(${@trackerService.display(field,datas)})]','DD/MM/YYYY HH:mm:ss'),[/]
 	format: 'DD/MM/YYYY HH:mm:ss',
 	icons: {
         time: "fa fa-clock",
@@ -50,7 +57,7 @@ $('#val_[(${field.name})]').datetimepicker({
 
 [# th:each="field,iter: ${@trackerService.field_list(tracker,'form',transition)}" th:if="${field.fieldType=='Date'}"]
 $('#val_[(${field.name})]').datetimepicker({
-	[# th:if="${datas}"]date: moment('[(${field.display(datas)})]','DD/MM/YYYY'),[/]
+	[# th:if="${datas}"]date: moment('[(${@trackerService.display(field,datas)})]','DD/MM/YYYY'),[/]
 	format: 'DD/MM/YYYY',
 	icons: {
         time: "fa fa-clock",
@@ -62,7 +69,7 @@ $('#val_[(${field.name})]').datetimepicker({
 [/]
 
 
-[# th:each="field,iter: ${@trackerService.field_list(tracker,'form',transition)}" th:if="${field.fieldType=='User'}"]
+[# th:each="field,iter: ${@trackerService.field_list(tracker,'form',transition)}" th:if="${field.fieldType=='User' && field.fieldWidget!='Auto'}"]
 $('#val_[(${field.name})]').select2({
   ajax: {
     url: /*[[@{/api/users}]]*/'/dummy/api/users',
@@ -71,11 +78,9 @@ $('#val_[(${field.name})]').select2({
     	var dat = $.map(data.content, function(obj){
     		var user = {id:obj.id,text:obj.name};
     		return user;
-    	});
-        // Transforms the top-level key of the response object from 'items' to 'results'
+    	});        
         return {results:dat};
-      }
-    // Additional AJAX parameters go here; see the end of this chapter for the full code of this example
+      }    
   }
 });
 [/]
@@ -83,17 +88,20 @@ $('#val_[(${field.name})]').select2({
 [# th:each="field,iter: ${@trackerService.field_list(tracker,'form',transition)}" th:if="${field.fieldType=='TrackerType'}"]
 $('#val_[(${field.name})]').select2({
   ajax: {
+	[# th:if="${datas?.get('id')!=null}"]
+	url: /*[[@{/api/trackers/query_field/{field_id}/{data_id}(field_id=${field.id},data_id=${datas?.get('id')})}]]*/'/dummy/api/users',
+	[/]
+	[# th:if="${datas?.get('id')==null}"]
     url: /*[[@{/api/trackers/query_field/{field_id}(field_id=${field.id})}]]*/'/dummy/api/users',
+    [/]
     dataType: 'json',
     processResults: function (data) {
     	var dat = $.map(data.content, function(obj){
-    		var user = {id:obj.id,text:obj.name};
-    		return user;
-    	});
-        // Transforms the top-level key of the response object from 'items' to 'results'
+    		var record = {id:obj.id,text:obj.name};
+    		return record;
+    	});        
         return {results:dat};
-      }
-    // Additional AJAX parameters go here; see the end of this chapter for the full code of this example
+      }    
   }
 });
 [/]
@@ -107,40 +115,50 @@ $('#val_[(${field.name})]').select2({
     	var dat = $.map(data.content, function(obj){
     		var node = {id:obj.id,text:obj.name};
     		return node;
-    	});
-        // Transforms the top-level key of the response object from 'items' to 'results'
+    	});        
         return {results:dat};
-      }
-    // Additional AJAX parameters go here; see the end of this chapter for the full code of this example
+      }    
   }
 });
 [/]
 </script>
 
 <div th:fragment="dataformfield(tracker,datas,field)" class="dataform form-group row">
-<div class='col-sm-3 col-form-label text-sm-right pr-0'><label class='mb-0' th:text="${field.label}">Module</label></div>
-<div class='col-sm-9' th:with="fieldclass=${'form-control col-sm-8 col-md-6 '}">
-<th:block th:if="${field.fieldWidget=='Default'}">
-<select th:if="${field.fieldType=='TreeNode' || field.fieldType=='TrackerType' || field.fieldType=='User'}" th:class="${fieldclass}" type='text' th:id="${'val_' + field.name}" th:name="${'val_' + field.name}">
-	<option th:value="${datas?.get(field.name)?.toString()}" th:text="${datas?.get(field.name)?.toString()}">option</option>
-</select>
-<input th:if="${field.fieldType!='TreeNode' && field.fieldType!='Date' && field.fieldType!='DateTime' && field.fieldType!='TrackerType' && field.fieldType!='User' && field.fieldType!='Text'}" th:class="${fieldclass + field.typeClass()}" type='text' th:id="${'val_' + field.name}" th:name="${'val_' + field.name}" th:value="${@trackerService.display(field,datas)}"/>
-<input th:if="${field.fieldType=='Date' || field.fieldType=='DateTime'}" th:class="${fieldclass + field.typeClass()}" type='text' th:id="${'val_' + field.name}" th:attr="data-target=${'#val_' + field.name}" data-toggle="datetimepicker" th:name="${'val_' + field.name}"/>
-<textarea th:if="${field.fieldType=='Text'}" th:class="${fieldclass + field.typeClass()}" th:id="${'val_' + field.name}" th:name="${'val_' + field.name}" th:text="${@trackerService.display(field,datas)}">
-</textarea>
-</th:block>
-<th:block th:if="${field.fieldWidget=='DropDown'}">
-<select th:class="${fieldclass}" type='text' th:id="${'val_' + field.name}" th:name="${'val_' + field.name}">
-	<option th:each="val,iter: ${@trackerService.field_options(field)}" th:value="${val['val']}" th:text="${val['label']}" th:selected="${datas?.get(field.name)?.toString()==val['val']}">option</option>
-</select>
-</th:block>
-</div>
+	<div class='col-sm-3 col-form-label text-sm-right pr-0'>
+		<label class='mb-0' th:text="${field.label}">Module</label>
+	</div>
+	<div class='col-sm-9' th:with="fieldclass=${'form-control col-sm-8 col-md-6 '}">
+		<th:block th:if="${field.fieldWidget=='Default'}" th:with="normalfield = ${ {'TreeNode','Date','DateTime','TrackerType','User','Text','Checkbox'} }">
+			
+			<input th:if="${!#arrays.contains(normalfield, field.fieldType)}" th:class="${fieldclass + field.typeClass()}" type='text' th:id="${'val_' + field.name}" th:name="${'val_' + field.name}" th:value="${@trackerService.display(field,datas)}"/>
+			
+			<input th:if="${field.fieldType=='Checkbox'}" th:class="${fieldclass + field.typeClass()}" type='checkbox' th:id="${'val_' + field.name}" th:name="${'val_' + field.name}" th:checked="${@trackerService.display(field,datas)=='true'}"/>
+			<input th:if="${field.fieldType=='Checkbox'}" type='hidden' th:id="${'_val_' + field.name}" th:name="${'_val_' + field.name}" value="off"/>
+			
+			<select th:if="${field.fieldType=='TreeNode' || field.fieldType=='TrackerType' || field.fieldType=='User'}" th:class="${fieldclass}" type='text' th:id="${'val_' + field.name}" th:name="${'val_' + field.name}">
+				<option th:value="${datas?.get(field.name)?.toString()}" th:text="${@trackerService.display(field,datas)}">option</option>
+			</select>
+			
+			<input th:if="${field.fieldType=='Date' || field.fieldType=='DateTime'}" th:class="${fieldclass + field.typeClass()}" type='text' th:id="${'val_' + field.name}" th:attr="data-target=${'#val_' + field.name}" data-toggle="datetimepicker" th:name="${'val_' + field.name}" th:value="${@trackerService.display(field,datas)}"/>
+			<textarea th:if="${field.fieldType=='Text'}" th:class="${fieldclass + field.typeClass()}" th:id="${'val_' + field.name}" th:name="${'val_' + field.name}" th:text="${@trackerService.display(field,datas)}">
+			</textarea>
+		</th:block>
+		
+		<th:block th:if="${field.fieldWidget=='DropDown'}">
+		<select th:class="${fieldclass}" type='text' th:id="${'val_' + field.name}" th:name="${'val_' + field.name}">
+			<option th:each="val,iter: ${@trackerService.field_options(field)}" th:value="${val['val']}" th:text="${val['label']}" th:selected="${datas?.get(field.name)?.toString()==val['val']}">option</option>
+		</select>
+		</th:block>	
+	</div>
 </div>
 
-<div th:fragment="datadisplay(tracker,datas)" class='datadisplay'>
-<div th:each="field,iter: ${@trackerService.field_list(tracker,'display',null)}" class='columns'>
-<div class='column is-one-quarter has-text-weight-bold' th:text="${field.label + ':'}">Form Fields:</div>
-<div class='column' th:text="${@trackerService.display(field,datas)}" >data_table</div>
+<div th:fragment="datadisplay(tracker,datas)" class='datadisplay m-3'>
+<div th:each="field,iter: ${@trackerService.field_list(tracker,'display',null)}">
+<div class='row pb-2'>
+<div class='col-2 is-one-quarter has-text-weight-bold text-right' th:text="${field.label + ':'}">Form Fields:</div>
+<div class='col-10' th:if="${field.FieldType!='HasMany'}" th:text="${@trackerService.display(field,datas)}" >data_table</div>
+<div class='col-10' th:if="${field.FieldType=='HasMany'}" th:utext="${@trackerService.display(field,datas)}" >data_table</div>
+</div>
 </div>
 </div>
 

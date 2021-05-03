@@ -52,20 +52,37 @@ public class TrackerField extends Auditable<String> {
 	
 	private String fieldType;
 	private String fieldWidget;
+	private String optionSourceType;
 	
 	@org.hibernate.annotations.Type( type = "text" )
 	private String optionSource;
 	
+	@org.hibernate.annotations.Type( type = "text" )
+	private String optionSourceGroovy;
+	
+	@org.hibernate.annotations.Type( type = "text" )
+	private String autoValue;
+	
 	@JsonIgnore
 	@ManyToOne( fetch = FetchType.LAZY )
 	@JoinColumn( name = "tracker_id" )
-	private Tracker tracker; 
+	private Tracker tracker;
 	
+	@JsonIgnore
 	@Transient
-	public String[] typeOptions = {"String","Text","Integer","Number","Date","DateTime","Checkbox","TreeNode","TrackerType","User"};
+	public String[] reserved_name = {"user","id","order","by","group","date","select","from","where","asc","desc","ct"};
 	
+	@JsonIgnore
 	@Transient
-	public String[] widgetOptions = {"Default","DropDown"};
+	public String[] typeOptions = {"String","Text","Integer","Number","Date","DateTime","Checkbox","TreeNode","TrackerType","User","HasMany"};
+	
+	@JsonIgnore
+	@Transient
+	public String[] widgetOptions = {"Default","DropDown","Auto"};
+	
+	@JsonIgnore
+	@Transient
+	public String[] optionSourceTypeOptions = {"JSON","Groovy"};
 	
 	public TrackerField copy(Tracker destTracker) {
 		TrackerField newfield = new TrackerField();
@@ -74,6 +91,7 @@ public class TrackerField extends Auditable<String> {
 		newfield.fieldType = this.fieldType;
 		newfield.fieldWidget = this.fieldWidget;
 		newfield.optionSource = this.optionSource;
+		newfield.autoValue = this.autoValue;
 		newfield.tracker = destTracker;
 		return newfield;
 	}
